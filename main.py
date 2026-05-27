@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS users (
 conn.commit()
 
 # =========================
-# VOCAB WORDS
+# WORD LIST
 # =========================
 
 BANKING_WORDS = [
@@ -166,7 +166,9 @@ def translate_text(text, target_lang):
 # =========================
 
 def get_word_data(word, target_lang):
+
     try:
+
         url = f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}"
 
         response = requests.get(url, timeout=10)
@@ -262,12 +264,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     welcome_text = """
 ╔════════════════════╗
-      ✨ 𝗦𝗔𝗛𝗔 𝗩𝗢𝗖𝗔𝗕 ✨
+      ✨ SAHA VOCAB ✨
 ╚════════════════════╝
 
-🎓 WELCOME TO
-THE ULTIMATE
-VOCABULARY BOT
+🎓 Welcome To
+Ultimate Vocabulary Bot
 
 🚀 Improve Your:
 🔹 Banking English
@@ -304,7 +305,7 @@ async def myid(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =========================
-# CHANGE LANGUAGE
+# LANGUAGE
 # =========================
 
 async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -315,7 +316,7 @@ async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =========================
-# SEND VOCAB WORDS
+# VOCAB WORDS
 # =========================
 
 async def send_words(update, count):
@@ -458,15 +459,12 @@ async def current_affairs(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         target_lang = get_user_language(user_id)
 
-        today = date.today().isoformat()
-
         url = "https://newsapi.org/v2/everything"
 
         params = {
-            "q": "India current affairs OR economy OR banking OR RBI OR government scheme",
+            "q": "India OR RBI OR banking OR economy OR government OR exam",
             "language": "en",
             "sortBy": "publishedAt",
-            "from": today,
             "pageSize": 20,
             "apiKey": NEWS_API_KEY
         }
@@ -491,17 +489,15 @@ async def current_affairs(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not articles:
 
             await update.message.reply_text(
-                "❌ No current affairs found today.",
+                "❌ No news found. Check News API key.",
                 reply_markup=keyboard
             )
 
             return
 
-        articles = articles[:20]
-
         reply = "🗞 TODAY'S CURRENT AFFAIRS\n\n"
 
-        for i, article in enumerate(articles, start=1):
+        for i, article in enumerate(articles[:20], start=1):
 
             title = article.get("title") or "No title"
 
@@ -606,7 +602,7 @@ async def total_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =========================
-# MAIN MESSAGE HANDLER
+# MAIN HANDLER
 # =========================
 
 async def meaning(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -616,8 +612,6 @@ async def meaning(update: Update, context: ContextTypes.DEFAULT_TYPE):
     add_user(user_id)
 
     text = update.message.text.strip().lower()
-
-    # BUTTONS
 
     if text == "📚 new 5 words":
         await send_words(update, 5)
