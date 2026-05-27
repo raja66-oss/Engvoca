@@ -1,7 +1,4 @@
-# Full final code with:
-# User count, admin broadcast, /id, language buttons,
-# professional meaning, examples and similar words.
-
+import os
 import random
 import requests
 import difflib
@@ -11,9 +8,9 @@ from deep_translator import GoogleTranslator
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-TOKEN = "8284413656:AAH3lAklbrVhdXn7dwlAPnDg2EOa9bSnTMQ"
-NEWS_API_KEY = "b3582497a8a7429abcc99f7c3fad95e2"
-ADMIN_ID = 8459676381
+TOKEN = os.getenv("8284413656:AAH3lAklbrVhdXn7dwlAPnDg2EOa9bSnTMQ")
+NEWS_API_KEY = os.getenv("b3582497a8a7429abcc99f7c3fad95e2")
+ADMIN_ID = int(os.getenv("8459676381"))
 
 conn = sqlite3.connect("saha_vocab.db", check_same_thread=False)
 cursor = conn.cursor()
@@ -116,6 +113,62 @@ def get_total_users():
     return cursor.fetchone()[0]
 
 
+def translate_text(text, target_lang):
+    try:
+        return GoogleTranslator(source="en", target=target_lang).translate(text)
+    except Exception:
+        return "Translation unavailable."
+
+
+def get_word_data(word, target_lang):
+    try:
+        url = f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}"
+        response = requests.get(url, timeout=10)
+
+        if response.status_code != 200:
+            return None
+
+        data = response.json()[0]
+
+        best_meaning = None
+        best_definition = None
+
+        for meaning in data.get("meanings", []):
+            for d in meaning.get("definitions", []):
+                definition = d.get("definition", "")
+                bad = ["musical scale", "tone of a musical"]
+                if len(definition) > 20 and not any(x in definition.lower() for x in bad):
+                    best_meaning = meaning
+                    best_definition = d
+                    break
+            if best_definition:
+                break
+
+        if not best_meaning:
+            best_meaning = data["meanings"][0]
+            best_definition = best_meaning["definitions"][0]
+
+        part = best_meaning.get("partOfSpeech", "N/A")
+        definition = best_definition.get("definition", "No definition found.")
+        example = best_definition.get("example", "No example available.")
+
+        synonyms = []
+        synonyms.extend(best_meaning.get("synonyms", []))
+        synonyms.extend(best_definition.get("synonyms", []))
+        synonyms = list(dict.fromkeys(synonyms))[:5]
+
+        if not synonyms:
+            synonyms = difflib.get_close_matches(word, COMMON_WORDS, n=5, cutoff=0.35)
+
+        translated_word = translate_text(word, target_lang)
+        translated_meaning = translate_text(definition, target_lang)
+
+        return word, translated_word, part, definition, translated_meaning, example, synonyms
+
+    except Exception:
+        return None
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     add_user(update.effective_user.id)
 
@@ -162,76 +215,12 @@ async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-def translate_text(text, target_lang):
-    if target_lang == "en":
-        return text
-
-    try:
-        return GoogleTranslator(source="en", target=target_lang).translate(text)
-    except Exception:
-        return "Translation unavailable."
-
-
-def get_word_data(word, target_lang):
-    url = f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}"
-
-    try:
-        response = requests.get(url, timeout=10)
-    except Exception:
-        return None
-
-    if response.status_code != 200:
-        return None
-
-    data = response.json()[0]
-
-    best_meaning = None
-    best_definition = None
-
-    for meaning in data.get("meanings", []):
-        for d in meaning.get("definitions", []):
-            definition = d.get("definition", "")
-
-            bad_words = ["musical scale", "tone of a musical"]
-            if len(definition) > 20 and not any(b in definition.lower() for b in bad_words):
-                best_meaning = meaning
-                best_definition = d
-                break
-
-        if best_definition:
-            break
-
-    if not best_meaning or not best_definition:
-        meaning = data.get("meanings", [])[0]
-        best_meaning = meaning
-        best_definition = meaning.get("definitions", [])[0]
-
-    part = best_meaning.get("partOfSpeech", "N/A")
-    definition = best_definition.get("definition", "No definition found.")
-    example = best_definition.get("example", "No example available.")
-
-    synonyms = []
-    synonyms.extend(best_meaning.get("synonyms", []))
-    synonyms.extend(best_definition.get("synonyms", []))
-
-    synonyms = list(dict.fromkeys(synonyms))[:5]
-
-    if not synonyms:
-        synonyms = difflib.get_close_matches(word, COMMON_WORDS, n=5, cutoff=0.35)
-
-    translated_word = translate_text(word, target_lang)
-    translated_meaning = translate_text(definition, target_lang)
-
-    return word, translated_word, part, definition, translated_meaning, example, synonyms
-
-
 async def send_words(update, count):
     user_id = update.effective_user.id
     target_lang = get_user_language(user_id)
 
     today_seed = str(date.today()) + str(count)
     random.seed(today_seed)
-
     words = random.sample(BANKING_WORDS, count)
 
     reply = f"📚 𝗧𝗼𝗱𝗮𝘆'𝘀 {count} 𝗕𝗮𝗻𝗸𝗶𝗻𝗴 𝗩𝗼𝗰𝗮𝗯 𝗪𝗼𝗿𝗱𝘀\n\n"
@@ -457,6 +446,9 @@ async def meaning(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=keyboard
             )
 
+
+if not TOKEN:
+    raise ValueError("TOKEN missing in Railway Variables")
 
 app = Application.builder().token(TOKEN).build()
 
