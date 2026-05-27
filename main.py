@@ -11,6 +11,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 TOKEN = "8284413656:AAH3lAklbrVhdXn7dwlAPnDg2EOa9bSnTMQ"
 NEWS_API_KEY = "b3582497a8a7429abcc99f7c3fad95e2"
 ADMIN_ID = 8459676381
+
 conn = sqlite3.connect("saha_vocab.db", check_same_thread=False)
 cursor = conn.cursor()
 
@@ -45,6 +46,7 @@ keyboard = ReplyKeyboardMarkup(
         [KeyboardButton("📚 New 5 Words")],
         [KeyboardButton("📚 New 10 Words")],
         [KeyboardButton("📰 Today Editorial")],
+        [KeyboardButton("🗞 Daily Current Affairs")],
         [KeyboardButton("🌐 Change Language")],
         [KeyboardButton("👥 Total Users")]
     ],
@@ -249,29 +251,44 @@ async def today_editorial(update):
         user_id = update.effective_user.id
         target_lang = get_user_language(user_id)
 
-        url = (
-            f"https://newsapi.org/v2/everything?"
-            f"q=banking OR economy OR finance"
-            f"&language=en"
-            f"&sortBy=publishedAt"
-            f"&pageSize=20"
-            f"&apiKey={NEWS_API_KEY}"
-        )
+        url = "https://newsapi.org/v2/everything"
 
-        response = requests.get(url, timeout=10).json()
+        params = {
+            "q": "banking OR economy OR finance OR RBI OR inflation",
+            "language": "en",
+            "sortBy": "publishedAt",
+            "pageSize": 10,
+            "apiKey": NEWS_API_KEY
+        }
+
+        response = requests.get(url, params=params, timeout=10).json()
         articles = response.get("articles", [])
 
         if not articles:
-            await update.message.reply_text("❌ No editorial found today.", reply_markup=keyboard)
-            return
+            full_passage = """
+India's banking and financial sector plays an important role in economic growth.
 
-        article = random.choice(articles)
+Banks help people save money, provide loans to businesses and support digital payments. A strong banking system improves investment, employment and financial stability.
 
-        title = article.get("title") or "Today's Editorial"
-        content = article.get("content") or ""
-        description = article.get("description") or ""
+For competitive exam aspirants, this topic is important because banking, inflation, RBI policy and financial awareness are common areas in exams and interviews.
 
-        full_passage = f"""
+Students should focus on:
+• Main issue
+• Causes
+• Economic impact
+• RBI role
+• Possible solutions
+
+Regular editorial reading improves vocabulary, comprehension and current affairs knowledge.
+"""
+            title = "Banking and Financial Awareness"
+        else:
+            article = random.choice(articles)
+            title = article.get("title") or "Today's Editorial"
+            description = article.get("description") or ""
+            content = article.get("content") or ""
+
+            full_passage = f"""
 {description}
 
 {content}
@@ -302,10 +319,73 @@ Daily editorial reading greatly improves English fluency and exam preparation.
 🪷 𝗧𝗿𝗮𝗻𝘀𝗹𝗮𝘁𝗶𝗼𝗻:
 {translated}
 """
+
         await update.message.reply_text(reply, reply_markup=keyboard)
 
-    except Exception:
-        await update.message.reply_text("❌ Editorial unavailable today.", reply_markup=keyboard)
+    except Exception as e:
+        await update.message.reply_text(
+            f"❌ Editorial error:\n{e}",
+            reply_markup=keyboard
+        )
+
+
+async def current_affairs(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        user_id = update.effective_user.id
+        target_lang = get_user_language(user_id)
+
+        url = "https://newsapi.org/v2/everything"
+
+        params = {
+            "q": "India economy OR banking OR RBI OR government scheme OR current affairs",
+            "language": "en",
+            "sortBy": "publishedAt",
+            "pageSize": 5,
+            "apiKey": NEWS_API_KEY
+        }
+
+        response = requests.get(url, params=params, timeout=10).json()
+
+        if response.get("status") != "ok":
+            await update.message.reply_text(
+                f"❌ News API Error:\n{response.get('message')}",
+                reply_markup=keyboard
+            )
+            return
+
+        articles = response.get("articles", [])
+
+        if not articles:
+            await update.message.reply_text(
+                "❌ No live news found. Check NEWS_API_KEY.",
+                reply_markup=keyboard
+            )
+            return
+
+        reply = "🗞 𝗗𝗔𝗜𝗟𝗬 𝗖𝗨𝗥𝗥𝗘𝗡𝗧 𝗔𝗙𝗙𝗔𝗜𝗥𝗦\n\n"
+
+        for i, article in enumerate(articles, start=1):
+            title = article.get("title") or "No title"
+            desc = article.get("description") or title
+            source = article.get("source", {}).get("name", "Unknown Source")
+
+            translated = translate_text(desc, target_lang)
+
+            reply += (
+                f"📌 {i}. {title}\n"
+                f"📰 Source: {source}\n\n"
+                f"🌍 English:\n{desc}\n\n"
+                f"🪷 Translation:\n{translated}\n\n"
+                f"━━━━━━━━━━━━━━━\n\n"
+            )
+
+        await update.message.reply_text(reply, reply_markup=keyboard)
+
+    except Exception as e:
+        await update.message.reply_text(
+            f"❌ Current Affairs Error:\n{e}",
+            reply_markup=keyboard
+        )
 
 
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -365,6 +445,10 @@ async def meaning(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if text == "📰 today editorial":
         await today_editorial(update)
+        return
+
+    if text == "🗞 daily current affairs":
+        await current_affairs(update, context)
         return
 
     if text == "🌐 change language":
@@ -447,7 +531,7 @@ async def meaning(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 if not TOKEN:
-    raise ValueError("TOKEN missing in Railway Variables")
+    raise ValueError("TOKEN missing")
 
 app = Application.builder().token(TOKEN).build()
 
