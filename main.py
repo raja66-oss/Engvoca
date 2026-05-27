@@ -8,7 +8,7 @@ from deep_translator import GoogleTranslator
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-TOKEN = os.getenv("8284413656:AAH3lAklbrVhdXn7dwlAPnDg2EOa9bSnTMQ")
+TOKEN = "8284413656:AAH3lAklbrVhdXn7dwlAPnDg2EOa9bSnTMQ"
 NEWS_API_KEY = os.getenv("b3582497a8a7429abcc99f7c3fad95e2")
 ADMIN_ID = 8459676381
 conn = sqlite3.connect("saha_vocab.db", check_same_thread=False)
