@@ -334,6 +334,67 @@ async def current_affairs(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         target_lang = get_user_language(user_id)
 
+        today = date.today().isoformat()
+
+        url = "https://newsapi.org/v2/everything"
+
+        params = {
+            "q": "India current affairs OR economy OR banking OR RBI OR government scheme OR international affairs",
+            "language": "en",
+            "sortBy": "publishedAt",
+            "from": today,
+            "pageSize": 20,
+            "apiKey": NEWS_API_KEY
+        }
+
+        response = requests.get(url, params=params, timeout=10).json()
+
+        if response.get("status") != "ok":
+            await update.message.reply_text(
+                f"❌ News API Error:\n{response.get('message')}",
+                reply_markup=keyboard
+            )
+            return
+
+        articles = response.get("articles", [])
+
+        if not articles:
+            await update.message.reply_text(
+                "❌ No current affairs found today. Try later.",
+                reply_markup=keyboard
+            )
+            return
+
+        articles = articles[:20]
+
+        reply = "🗞 𝗧𝗢𝗗𝗔𝗬'𝗦 𝗖𝗨𝗥𝗥𝗘𝗡𝗧 𝗔𝗙𝗙𝗔𝗜𝗥𝗦\n\n"
+
+        for i, article in enumerate(articles, start=1):
+            title = article.get("title") or "No title"
+            desc = article.get("description") or title
+            source = article.get("source", {}).get("name", "Unknown Source")
+
+            translated = translate_text(desc, target_lang)
+
+            reply += (
+                f"📌 {i}. {title}\n"
+                f"📰 Source: {source}\n\n"
+                f"🌍 English:\n{desc}\n\n"
+                f"🪷 Translation:\n{translated}\n\n"
+                f"━━━━━━━━━━━━━━━\n\n"
+            )
+
+        await update.message.reply_text(reply, reply_markup=keyboard)
+
+    except Exception as e:
+        await update.message.reply_text(
+            f"❌ Current Affairs Error:\n{e}",
+            reply_markup=keyboard
+        )
+    try:
+        user_id = update.effective_user.id
+        target_lang = get_user_language(user_id)
+
         url = "https://newsapi.org/v2/everything"
 
         params = {
